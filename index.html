@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>DBConverter — MySQL → PostgreSQL</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="static/style.css">
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════ CARREGANDO -->
+<div id="bootPage"><div class="spinner"></div></div>
+
+<!-- ════════════════════════════════════════════════ LOGIN / CADASTRO -->
+<div id="loginPage" class="hidden">
+  <div class="lcard">
+    <div class="llogo">
+      <svg width="34" height="34" viewBox="0 0 34 34" fill="none" style="color:#60a5fa" aria-hidden="true">
+        <ellipse cx="17" cy="9" rx="13" ry="5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M4 9v9c0 2.8 5.8 5 13 5s13-2.2 13-5V9" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M4 18v7c0 2.8 5.8 5 13 5s13-2.2 13-5v-7" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <circle cx="26" cy="26" r="7" fill="#0f172a" stroke="#60a5fa" stroke-width="1.5"/>
+        <path d="M23 26l2.5 2.5L29 22.5" stroke="#60a5fa" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div class="llogo-text">DB<span>Converter</span></div>
+    </div>
+
+    <div class="ltabs" role="tablist">
+      <button class="ltab active" id="tabLogin" type="button" onclick="showAuth('login')">Entrar</button>
+      <button class="ltab" id="tabRegister" type="button" onclick="showAuth('register')">Criar conta</button>
+    </div>
+
+    <div class="lerr" id="authErr" role="alert"></div>
+    <div class="lok" id="authOk" role="status"></div>
+
+    <!-- Entrar -->
+    <form id="loginForm" onsubmit="doLogin(event)" autocomplete="on">
+      <h1 class="ltitle">Bem-vindo de volta</h1>
+      <p class="lsub">Conversor web de banco de dados — migração MySQL → PostgreSQL com rastreabilidade completa.</p>
+      <div class="lg">
+        <label class="ll" for="lu">Usuário</label>
+        <input class="li" type="text" id="lu" autocomplete="username" placeholder="seu.usuario" required/>
+      </div>
+      <div class="lg">
+        <label class="ll" for="lp">Senha</label>
+        <div class="pwrap">
+          <input class="li" type="password" id="lp" autocomplete="current-password" placeholder="••••••••" required/>
+          <button type="button" class="peye" onclick="togglePw('lp',this)" aria-label="Mostrar senha">mostrar</button>
+        </div>
+      </div>
+      <button class="lbtn" type="submit" id="loginBtn">Entrar no sistema</button>
+      <p class="lhint" id="demoHint">Conta de demonstração: <strong>admin</strong> / <strong>demo123</strong> · ou <a href="#" onclick="showAuth('register');return false">crie a sua</a></p>
+    </form>
+
+    <!-- Criar conta -->
+    <form id="registerForm" class="hidden" onsubmit="doRegister(event)" autocomplete="on">
+      <h1 class="ltitle">Criar conta</h1>
+      <p class="lsub">Cada usuário tem o seu próprio histórico de conversões e relatórios.</p>
+      <div class="lg">
+        <label class="ll" for="rn">Nome completo</label>
+        <input class="li" type="text" id="rn" autocomplete="name" placeholder="Maria da Silva" required minlength="2"/>
+      </div>
+      <div class="lg">
+        <label class="ll" for="ru">Usuário</label>
+        <input class="li" type="text" id="ru" autocomplete="username" placeholder="maria.silva" required pattern="[A-Za-z0-9_.\-]{3,30}"/>
+        <div class="lnote">3 a 30 caracteres: letras, números, ponto, hífen ou _</div>
+      </div>
+      <div class="lg">
+        <label class="ll" for="rp">Senha</label>
+        <div class="pwrap">
+          <input class="li" type="password" id="rp" autocomplete="new-password" placeholder="mínimo 6 caracteres" required minlength="6" oninput="pwMeter()"/>
+          <button type="button" class="peye" onclick="togglePw('rp',this)" aria-label="Mostrar senha">mostrar</button>
+        </div>
+        <div class="pmeter"><div id="pmBar"></div></div>
+        <div class="lnote" id="pmText">Use letras e números.</div>
+      </div>
+      <div class="lg">
+        <label class="ll" for="rc">Confirmar senha</label>
+        <input class="li" type="password" id="rc" autocomplete="new-password" placeholder="repita a senha" required/>
+      </div>
+      <button class="lbtn" type="submit" id="registerBtn">Criar conta e entrar</button>
+      <p class="lhint">Já tem conta? <a href="#" onclick="showAuth('login');return false">Entrar</a></p>
+    </form>
+
+    <p class="lmode" id="modeNote"></p>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════ APLICAÇÃO -->
+<div id="appPage" class="hidden">
+
+  <aside class="sidebar">
+    <div class="sb-logo">
+      <svg width="24" height="24" viewBox="0 0 34 34" fill="none" style="color:#60a5fa" aria-hidden="true">
+        <ellipse cx="17" cy="9" rx="13" ry="5" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path d="M4 9v9c0 2.8 5.8 5 13 5s13-2.2 13-5V9" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path d="M4 18v7c0 2.8 5.8 5 13 5s13-2.2 13-5v-7" fill="none" stroke="currentColor" stroke-width="2"/>
+      </svg>
+      <div class="sb-logo-t">DB<span>Converter</span></div>
+    </div>
+    <nav class="sb-nav">
+      <div class="sb-sec">Principal</div>
+      <a class="si active" data-page="conv" href="#" onclick="goPage('conv');return false">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+        Nova Conversão
+      </a>
+      <a class="si" data-page="hist" href="#" onclick="goPage('hist');return false">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Histórico e Relatórios
+      </a>
+      <div class="sb-sec">Referência</div>
+      <a class="si" data-page="map" href="#" onclick="goPage('map');return false">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+        Mapeamentos
+      </a>
+    </nav>
+    <div class="sb-mode" id="sbMode"></div>
+    <div class="sb-bot">
+      <div class="uchip">
+        <div class="uav" id="uAvatar">?</div>
+        <div class="ui-">
+          <div class="un" id="uName">—</div>
+          <div class="ur" id="uRole">—</div>
+        </div>
+        <button class="logbtn" onclick="doLogout()" title="Sair" aria-label="Sair">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- barra superior no celular -->
+  <div class="mbar">
+    <div class="sb-logo-t">DB<span>Converter</span></div>
+    <select id="mNav" onchange="goPage(this.value)" aria-label="Navegação">
+      <option value="conv">Nova Conversão</option>
+      <option value="hist">Histórico e Relatórios</option>
+      <option value="map">Mapeamentos</option>
+    </select>
+    <button class="btn bs bsm" onclick="doLogout()">Sair</button>
+  </div>
+
+  <main class="main">
+
+    <!-- ══ PÁGINA: CONVERSÃO ══ -->
+    <div class="page active" id="page-conv">
+      <div class="ph">
+        <h1 class="pt">Nova Conversão</h1>
+        <p class="ps">Converta esquemas e dados MySQL para PostgreSQL — ETL em 3 etapas com relatório detalhado.</p>
+      </div>
+
+      <div class="stepper">
+        <div class="step active" id="st1"><div class="step-inner"><div class="snum" id="sn1">1</div><div class="slabel">Conexão &amp; SQL</div></div></div>
+        <div class="sline" id="sl1"></div>
+        <div class="step" id="st2"><div class="step-inner"><div class="snum" id="sn2">2</div><div class="slabel">Tabelas e modo</div></div></div>
+        <div class="sline" id="sl2"></div>
+        <div class="step" id="st3"><div class="step-inner"><div class="snum" id="sn3">3</div><div class="slabel">Resultado</div></div></div>
+      </div>
+
+      <!-- ▶ ETAPA 1 -->
+      <div id="sc1">
+        <div class="card">
+          <div class="ct">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            Cole ou abra um script MySQL
+          </div>
+          <p class="cdesc">Aceita <code>CREATE TABLE</code>, <code>INSERT</code>, <code>ALTER TABLE</code> e exportações completas do <strong>mysqldump</strong> e do <strong>phpMyAdmin</strong>.</p>
+          <textarea class="sql-ta" id="sqlIn" spellcheck="false">-- Tabela de exemplo: usuarios
+CREATE TABLE `usuarios` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `nome` VARCHAR(100) NOT NULL,
+  `email` VARCHAR(255) NOT NULL,
+  `ativo` TINYINT(1) DEFAULT 1,
+  `perfil` ENUM('admin','editor','leitor') NOT NULL DEFAULT 'leitor',
+  `criado_em` DATETIME DEFAULT NOW(),
+  `saldo` DECIMAL(10,2) UNSIGNED DEFAULT 0.00,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_email` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO `usuarios` VALUES (1,'Ana','ana@exemplo.com',1,'admin','2024-03-01 09:15:00',150.00);</textarea>
+          <div class="brow-sb">
+            <label class="btn bs" for="sqlFile">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Abrir arquivo .sql
+            </label>
+            <input type="file" id="sqlFile" accept=".sql,.txt,text/plain" class="hidden" onchange="loadSqlFile(this)">
+            <button class="btn bp" onclick="fromSQLStep()">
+              Analisar SQL
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="ct">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>
+            Ou: use o banco de demonstração
+          </div>
+          <div class="hint">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span>Conexão <strong>simulada</strong>: o navegador não acessa um MySQL diretamente. <strong>Testar Conexão</strong> carrega o banco de exemplo <em>loja_ecommerce</em> (5 tabelas com dados).</span>
+          </div>
+          <div class="frow">
+            <div><label class="al" for="dbHost">Host</label><input class="ai" id="dbHost" value="localhost"/></div>
+            <div><label class="al" for="dbPort">Porta</label><input class="ai" id="dbPort" value="3306" inputmode="numeric"/></div>
+          </div>
+          <div class="frow">
+            <div><label class="al" for="dbUser">Usuário</label><input class="ai" id="dbUser" value="root" autocomplete="off"/></div>
+            <div><label class="al" for="dbPass">Senha</label><input class="ai" type="password" id="dbPass" autocomplete="off" placeholder="não é enviada nem salva"/></div>
+          </div>
+          <div class="frow-1">
+            <label class="al" for="dbName">Nome do Banco</label>
+            <input class="ai" id="dbName" value="loja_ecommerce"/>
+          </div>
+          <div id="cstat" class="cstat"></div>
+          <div class="brow">
+            <button class="btn bs" onclick="testConn()" id="connBtn">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              Testar Conexão
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ▶ ETAPA 2 -->
+      <div id="sc2" class="hidden">
+        <div class="card">
+          <div class="ct">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+            <span id="tblTitle">Tabelas encontradas em</span> <span id="dbLabel" class="dblabel">loja_ecommerce</span>
+          </div>
+          <div class="selrow" id="selRow">
+            <div class="tchk" id="saBox" onclick="selAll()" role="checkbox" aria-label="Selecionar tudo" tabindex="0">
+              <svg width="11" height="11" fill="none" stroke="#fff" stroke-width="2.5" viewBox="0 0 24 24" id="saChk" style="display:none"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <span class="selall" onclick="selAll()">Selecionar tudo</span>
+            <span class="selcount" id="selCount">0 selecionadas</span>
+          </div>
+          <p class="cdesc hidden" id="manualNote">No SQL manual, o script inteiro é convertido. Estas são as tabelas detectadas:</p>
+          <div class="tlist" id="tList"></div>
+
+          <div class="divider"></div>
+          <div class="sub-h">Modo de conversão</div>
+          <div class="radios">
+            <label><input type="radio" name="mode" value="ddl"> Somente estrutura (DDL)</label>
+            <label><input type="radio" name="mode" value="full" checked> Estrutura + Dados (DDL + DML)</label>
+          </div>
+          <div class="brow">
+            <button class="btn bs" onclick="goStep(1)">← Voltar</button>
+            <button class="btn bp" onclick="startConv()" id="convBtn">
+              Iniciar Conversão
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ▶ ETAPA 3 -->
+      <div id="sc3" class="hidden">
+        <div class="card convprog" id="cprog">
+          <div class="spinner"></div>
+          <div class="pt2" id="ptext">Extraindo estrutura...</div>
+          <div class="ps2" id="psub">Analisando o script MySQL</div>
+          <div class="pbar-w"><div class="pbar" id="pbar"></div></div>
+        </div>
+
+        <div id="cres" class="hidden">
+          <div class="sgrid">
+            <div class="scard ok"><div class="sval" id="sTables">0</div><div class="slbl">Tabelas Convertidas</div></div>
+            <div class="scard info"><div class="sval" id="sCols">0</div><div class="slbl">Colunas Mapeadas</div></div>
+            <div class="scard warn"><div class="sval" id="sWarn">0</div><div class="slbl">Avisos</div></div>
+            <div class="scard err"><div class="sval" id="sErr">0</div><div class="slbl">Erros</div></div>
+          </div>
+          <p class="sline2" id="sExtra"></p>
+
+          <div class="card">
+            <div class="tabs" role="tablist">
+              <button class="tab active" data-tab="tc-sql" onclick="switchTab(this)">Script PostgreSQL</button>
+              <button class="tab" data-tab="tc-log" onclick="switchTab(this)">Log de Alterações</button>
+              <button class="tab" data-tab="tc-diff" onclick="switchTab(this)">Comparativo</button>
+            </div>
+
+            <div class="tcont active" id="tc-sql">
+              <div class="sqlpanel">
+                <div class="sqlhdr">
+                  <div class="sqlhdr-l"><div class="dot dot-pg"></div>PostgreSQL — Script Gerado</div>
+                  <button class="btn bsm bdark" onclick="cpSQL()">
+                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    Copiar SQL
+                  </button>
+                </div>
+                <div class="sqlbody"><pre id="sqlOut">-- aguardando...</pre></div>
+              </div>
+            </div>
+
+            <div class="tcont" id="tc-log">
+              <div class="lfilter" id="logFilter">
+                <button class="chip active" data-f="all" onclick="filterLog('all')">Todos</button>
+                <button class="chip" data-f="warn" onclick="filterLog('warn')">Avisos</button>
+                <button class="chip" data-f="err" onclick="filterLog('err')">Erros</button>
+              </div>
+              <div class="tscroll">
+                <table class="ltbl">
+                  <thead><tr><th>Tabela</th><th>Coluna</th><th>MySQL (origem)</th><th>PostgreSQL (destino)</th><th>Status</th><th>Observação</th></tr></thead>
+                  <tbody id="logBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="tcont" id="tc-diff">
+              <div class="diffpanel">
+                <div class="sqlpanel">
+                  <div class="sqlhdr"><div class="sqlhdr-l"><div class="dot dot-my"></div>MySQL — Original</div></div>
+                  <div class="sqlbody tall"><pre id="dOrig"></pre></div>
+                </div>
+                <div class="sqlpanel">
+                  <div class="sqlhdr"><div class="sqlhdr-l"><div class="dot dot-pg"></div>PostgreSQL — Convertido</div></div>
+                  <div class="sqlbody tall"><pre id="dConv"></pre></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card savecard">
+            <div class="ct">
+              <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              Salvar relatório da conversão
+            </div>
+            <p class="cdesc">A conversão já foi salva no seu histórico. Baixe o relatório com identificação, resumo, log de alterações e scripts.</p>
+            <div class="brow wrap">
+              <button class="btn bp" onclick="reportCurrent('pdf')">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Relatório PDF
+              </button>
+              <button class="btn bs" onclick="reportCurrent('html')">Relatório HTML</button>
+              <button class="btn bs" onclick="reportCurrent('sql')">Script .sql</button>
+            </div>
+          </div>
+
+          <div class="brow">
+            <button class="btn bs" onclick="resetConv()">← Nova Conversão</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ PÁGINA: HISTÓRICO ══ -->
+    <div class="page" id="page-hist">
+      <div class="ph">
+        <h1 class="pt">Histórico e Relatórios</h1>
+        <p class="ps" id="histSub">Suas conversões salvas. Abra uma conversão ou baixe o relatório novamente.</p>
+      </div>
+      <div class="card">
+        <div class="tscroll">
+          <table class="ltbl">
+            <thead><tr><th>Data / Hora</th><th>Banco</th><th>Modo</th><th>Tabelas</th><th>Status</th><th class="tr">Ações</th></tr></thead>
+            <tbody id="histBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ PÁGINA: MAPEAMENTOS ══ -->
+    <div class="page" id="page-map">
+      <div class="ph">
+        <h1 class="pt">Mapeamentos de Tipos</h1>
+        <p class="ps">Regras aplicadas pelo conversor na etapa Transform do ETL.</p>
+      </div>
+      <div class="card">
+        <div class="tscroll">
+          <table class="maptbl"><tbody id="mapBody"></tbody></table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ct">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Ordem do script gerado
+        </div>
+        <p class="cdesc" style="margin:0">O script PostgreSQL é montado em seções, na ordem usada pelo <span class="mono">pg_dump</span>:
+          remoção de tabelas → tabelas → comentários → dados → índices → sequências → chaves estrangeiras.
+          Assim ele roda do início ao fim mesmo que o MySQL tenha as tabelas em outra ordem.</p>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- MODAL DE CONFIRMAÇÃO -->
+<div class="modal hidden" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="cmTitle">
+  <div class="mcard">
+    <h3 id="cmTitle">Confirmar</h3>
+    <p id="cmText"></p>
+    <div class="brow-r" style="margin-top:20px">
+      <button class="btn bs" onclick="closeConfirm(false)">Cancelar</button>
+      <button class="btn bdanger" onclick="closeConfirm(true)">Excluir</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast" role="status">
+  <span id="toastMsg"></span>
+</div>
+
+<!-- DBC_BACKEND: o Flask troca esta linha por um script que ativa o modo servidor -->
+<script src="static/vendor/jspdf.umd.min.js"></script>
+<script src="static/vendor/jspdf.plugin.autotable.min.js"></script>
+<script src="static/converter.js"></script>
+<script src="static/demo-data.js"></script>
+<script src="static/backend.js"></script>
+<script src="static/report.js"></script>
+<script src="static/app.js"></script>
+</body>
+</html>
